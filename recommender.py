@@ -40,17 +40,17 @@ def find_streaming_platforms_by_name(show_name):
         data = response.json()
 
         if data.get("items"):
-            platforms = data["items"][0]["offers"]
-
-            services = []
-            for platform in platforms:
-                if platform["monetization_type"] == "flatrate":
-                    services.append(platform["provider_id"])
+            offers = data["items"][0].get("offers", [])
+            platforms = [
+                platform["provider_id"]
+                for platform in offers
+                if platform["monetization_type"] == "flatrate"
+            ]
 
             platform_names = []
-            for service in services:
+            for platform in platforms:
                 for provider in provider_details:
-                    if service == provider["id"]:
+                    if platform == provider["id"]:
                         platform_names.append(provider["clear_name"])
 
             platform_names = list(set(platform_names))
@@ -60,28 +60,31 @@ def find_streaming_platforms_by_name(show_name):
     return None
 
 
-def find_highest_rated_shows(start_date, end_date, num_results):
-    print("Finding the highest rated shows...")
-    imdb_url = f"https://imdb-api.com/en/API/MostPopularTVs/{api_key}"
+def find_highest_rated(start_date, end_date, num_results, option):
+    imdb_url = f"https://imdb-api.com/en/API/MostPopular{option}/{api_key}"
     imdb_response = requests.get(imdb_url)
 
     if imdb_response.status_code == 200:
         imdb_data = imdb_response.json()
-        shows = imdb_data["items"]
+        results = imdb_data["items"]
 
         # Filter shows within the specified date range
-        filtered_shows = [
-            show for show in shows if start_date <= show["year"] <= end_date
+        filtered_results = [
+            result for result in results if start_date <= result["year"] <= end_date
         ]
 
+        for result in filtered_results:
+            if result["imDbRating"] == "":
+                result["imDbRating"] = "0.0"
+
         # Sort shows based on ratings
-        sorted_shows = sorted(
-            filtered_shows, key=lambda x: float(x["imDbRating"]), reverse=True
+        sorted_results = sorted(
+            filtered_results, key=lambda x: float(x["imDbRating"]), reverse=True
         )
 
-        for show in sorted_shows[:num_results]:
-            platforms = find_streaming_platforms_by_name(show["title"])
-            print(show["title"] + " (" + show["year"] + ") - " + show["imDbRating"])
+        for result in sorted_results[:num_results]:
+            platforms = find_streaming_platforms_by_name(result["title"])
+            print(result["fullTitle"] + " - " + result["imDbRating"])
             print("Available on: " + ", ".join(platforms) + "\n")
 
     else:
@@ -91,4 +94,4 @@ def find_highest_rated_shows(start_date, end_date, num_results):
 
 
 # Example usage
-find_highest_rated_shows("2018", "2020", 5)
+find_highest_rated("2018", "2022", 8, "Movies")
