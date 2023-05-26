@@ -1,8 +1,10 @@
 import requests
+from credentials import api_key
+from justwatch import JustWatch
 
 
 def find_streaming_platforms_by_name(show_name):
-    justwatch_url = "https://apis.justwatch.com/content/titles/en_US/popular"
+    justwatch_url = "https://apis.justwatch.com/content/titles/en_GB/popular"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
     }
@@ -30,23 +32,35 @@ def find_streaming_platforms_by_name(show_name):
     }
 
     response = requests.post(justwatch_url, json=payload, headers=headers)
-    print(response.json())
+
+    just_watch = JustWatch(country="GB")
+    provider_details = just_watch.get_providers()
 
     if response.status_code == 200:
         data = response.json()
-        print(data)
 
         if data.get("items"):
             platforms = data["items"][0]["offers"]
 
-            platform_names = [platform["provider_id"] for platform in platforms]
+            services = []
+            for platform in platforms:
+                if platform["monetization_type"] == "flatrate":
+                    services.append(platform["provider_id"])
+
+            platform_names = []
+            for service in services:
+                for provider in provider_details:
+                    if service == provider["id"]:
+                        platform_names.append(provider["clear_name"])
+
+            platform_names = list(set(platform_names))
+
             return platform_names
 
     return None
 
 
 def find_highest_rated_shows(start_date, end_date, num_results):
-    api_key = "k_si04o5n5"
     print("Finding the highest rated shows...")
     imdb_url = f"https://imdb-api.com/en/API/MostPopularTVs/{api_key}"
     imdb_response = requests.get(imdb_url)
@@ -66,7 +80,9 @@ def find_highest_rated_shows(start_date, end_date, num_results):
         )
 
         for show in sorted_shows[:num_results]:
+            platforms = find_streaming_platforms_by_name(show["title"])
             print(show["title"] + " (" + show["year"] + ") - " + show["imDbRating"])
+            print("Available on: " + ", ".join(platforms) + "\n")
 
     else:
         print("Error occurred while retrieving data from the IMDb API.")
@@ -75,6 +91,4 @@ def find_highest_rated_shows(start_date, end_date, num_results):
 
 
 # Example usage
-# find_highest_rated_shows("2018", "2020", 5)
-
-print(find_streaming_platforms_by_name("Succession"))
+find_highest_rated_shows("2018", "2020", 5)
